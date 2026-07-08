@@ -1,0 +1,13 @@
+# Secrets — never commit
+.env
+.env.local
+node_modules/
+
+# Optional local proxy logs
+*.log
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

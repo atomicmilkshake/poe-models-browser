@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Poe Models Browser</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;600;700&family=Rajdhani:wght@500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+
+    <header class="topbar">
+      <div class="topbar-brand">
+        <h1>Poe Models Browser</h1>
+        <p>Browse // filter // chart the Poe <code>/v1/models</code> catalog. Benchmarks cross-referenced from OpenRouter.</p>
+      </div>
+      <form class="topbar-fetch" id="fetchForm">
+        <label class="field">
+          <span class="field-label">Endpoint URL</span>
+          <input id="endpointUrl" type="text" value="http://localhost:8787/api/models" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="field-label">Fallback URL (optional)</span>
+          <input id="proxyUrl" type="text" placeholder="https://api.poe.com/v1/models" autocomplete="off" />
+        </label>
+        <button id="loadBtn" type="submit" class="btn btn-primary">Load Models</button>
+        <button id="demoBtn" type="button" class="btn">Load Demo Data</button>
+        <button id="refreshBenchmarksBtn" type="button" class="btn">Refresh benchmarks</button>
+      </form>
+    </header>
+
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-block">
+          <span class="field-label">Search</span>
+          <input id="searchInput" type="search" placeholder="id, owner, description, endpoints..." />
+        </div>
+
+        <div class="sidebar-block">
+          <div class="sidebar-block-head">
+            <h2>Filters</h2>
+            <button id="clearFiltersBtn" type="button" class="btn btn-ghost btn-small">Clear all</button>
+          </div>
+
+          <div class="quick-chip-row">
+            <button id="pricedOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false">Priced only</button>
+            <button id="benchmarkedOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false" title="Only models matched to an OpenRouter benchmark entry.">Has benchmark</button>
+            <button id="toolsOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false">Supports tools</button>
+            <button id="webSearchOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false">Web search</button>
+            <button id="paretoOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false" title="Show only models on the cost-vs-intelligence Pareto frontier. Requires benchmark match and per-token pricing.">Pareto frontier</button>
+          </div>
+
+          <section class="facet">
+            <h3>Price &amp; size</h3>
+            <div class="range-filters" id="rangeFilters">
+              <div class="slider-field" data-slider="blended">
+                <div class="slider-head">
+                  <span class="field-label">Blended $/1M</span>
+                  <span class="slider-value" id="blendedValue">Any</span>
+                </div>
+                <div class="dual-slider">
+                  <div class="dual-slider-track" aria-hidden="true"></div>
+                  <div class="dual-slider-range" id="blendedTrack" aria-hidden="true"></div>
+                  <input id="blendedMin" type="range" min="0" max="100" step="0.1" value="0" aria-label="Minimum blended price" />
+                  <input id="blendedMax" type="range" min="0" max="100" step="0.1" value="100" aria-label="Maximum blended price" />
+                </div>
+              </div>
+              <div class="slider-field" data-slider="prompt">
+                <div class="slider-head">
+                  <span class="field-label">Prompt $/1M</span>
+                  <span class="slider-value" id="promptValue">Any</span>
+                </div>
+                <div class="dual-slider">
+                  <div class="dual-slider-track" aria-hidden="true"></div>
+                  <div class="dual-slider-range" id="promptTrack" aria-hidden="true"></div>
+                  <input id="promptMin" type="range" min="0" max="100" step="0.1" value="0" aria-label="Minimum prompt price" />
+                  <input id="promptMax" type="range" min="0" max="100" step="0.1" value="100" aria-label="Maximum prompt price" />
+                </div>
+              </div>
+              <div class="slider-field" data-slider="completion">
+                <div class="slider-head">
+                  <span class="field-label">Completion $/1M</span>
+                  <span class="slider-value" id="completionValue">Any</span>
+                </div>
+                <div class="dual-slider">
+                  <div class="dual-slider-track" aria-hidden="true"></div>
+                  <div class="dual-slider-range" id="completionTrack" aria-hidden="true"></div>
+                  <input id="completionMin" type="range" min="0" max="100" step="0.1" value="0" aria-label="Minimum completion price" />
+                  <input id="completionMax" type="range" min="0" max="100" step="0.1" value="100" aria-label="Maximum completion price" />
+                </div>
+              </div>
+              <div class="slider-field" data-slider="context">
+                <div class="slider-head">
+                  <span class="field-label">Context tokens</span>
+                  <span class="slider-value" id="contextValue">Any</span>
+                </div>
+                <div class="dual-slider">
+                  <div class="dual-slider-track" aria-hidden="true"></div>
+                  <div class="dual-slider-range" id="contextTrack" aria-hidden="true"></div>
+                  <input id="contextMin" type="range" min="0" max="2000000" step="1000" value="0" aria-label="Minimum context length" />
+                  <input id="contextMax" type="range" min="0" max="2000000" step="1000" value="2000000" aria-label="Maximum context length" />
+                </div>
+              </div>
+              <div class="slider-field" data-slider="intel">
+                <div class="slider-head">
+                  <span class="field-label">Intelligence index</span>
+                  <span class="slider-value" id="intelValue">Any</span>
+                </div>
+                <div class="dual-slider">
+                  <div class="dual-slider-track" aria-hidden="true"></div>
+                  <div class="dual-slider-range" id="intelTrack" aria-hidden="true"></div>
+                  <input id="intelMin" type="range" min="0" max="100" step="0.1" value="0" aria-label="Minimum intelligence index" />
+                  <input id="intelMax" type="range" min="0" max="100" step="0.1" value="100" aria-label="Maximum intelligence index" />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="facet">
+            <h3>Owner</h3>
+            <div id="ownerChips" class="chip-list"></div>
+          </section>
+          <section class="facet">
+            <h3>Input modality</h3>
+            <div id="inputChips" class="chip-list"></div>
+          </section>
+          <section class="facet">
+            <h3>Output modality</h3>
+            <div id="outputChips" class="chip-list"></div>
+          </section>
+          <section class="facet">
+            <h3>Endpoint</h3>
+            <div id="endpointChips" class="chip-list"></div>
+          </section>
+          <section class="facet">
+            <h3>Feature</h3>
+            <div id="featureChips" class="chip-list"></div>
+          </section>
+        </div>
+      </aside>
+
+      <main class="content">
+        <div class="toolbar">
+          <label class="field field-compact">
+            <span class="field-label">Sort by</span>
+            <select id="sortBy">
+              <option value="id">Model id</option>
+              <option value="display_name">Display name</option>
+              <option value="owned_by">Owner</option>
+              <option value="created">Created</option>
+              <option value="context_length">Context length</option>
+              <option value="price_prompt">Prompt price</option>
+              <option value="price_completion">Completion price</option>
+            </select>
+          </label>
+
+          <label class="field field-compact">
+            <span class="field-label">Direction</span>
+            <select id="sortDir">
+              <option value="asc">Ascending</option>
+              <option value="desc">Descending</option>
+            </select>
+          </label>
+
+          <label class="field field-compact">
+            <span class="field-label">Group by</span>
+            <select id="groupBy">
+              <option value="none">None</option>
+              <option value="owned_by">Owner</option>
+              <option value="input_primary">Input modality</option>
+              <option value="output_primary">Output modality</option>
+              <option value="endpoint_primary">Endpoint</option>
+            </select>
+          </label>
+
+          <label class="field field-compact">
+            <span class="field-label">View</span>
+            <select id="viewMode">
+              <option value="table">Table</option>
+              <option value="cards">Cards</option>
+            </select>
+          </label>
+
+          <div class="toolbar-actions">
+            <button id="exportJsonBtn" type="button" class="btn">Export JSON</button>
+            <button id="exportCsvBtn" type="button" class="btn">Export CSV</button>
+          </div>
+        </div>
+
+        <div id="stats" class="stats"></div>
+
+        <div id="status" class="status-line" aria-live="polite" aria-atomic="true">Click "Load Models" or "Load Demo Data" to begin.</div>
+
+        <details class="chart-panel" id="chartPanel">
+          <summary>Capability vs cost chart</summary>
+          <div class="chart-controls">
+            <label class="field field-compact">
+              <span class="field-label">Y axis (capability)</span>
+              <select id="chartYAxis"></select>
+            </label>
+            <label class="field field-compact">
+              <span class="field-label">X axis (cost/perf)</span>
+              <select id="chartXAxis"></select>
+            </label>
+            <div class="chart-presets" aria-label="Quick price filters">
+              <span class="field-label">Blended price</span>
+              <div class="quick-chip-row chart-preset-row">
+                <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="" aria-pressed="true">Any</button>
+                <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="1" aria-pressed="false">&lt; $1</button>
+                <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="5" aria-pressed="false">&lt; $5</button>
+                <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="20" aria-pressed="false">&lt; $20</button>
+              </div>
+            </div>
+          </div>
+          <div class="chart-wrap">
+            <svg id="benchmarkChart" role="img" aria-label="Benchmark scatter plot"></svg>
+            <div id="chartTooltip" class="chart-tooltip" aria-hidden="true"></div>
+          </div>
+          <p class="chart-attribution">Benchmark data from <a href="https://openrouter.ai/" target="_blank" rel="noopener noreferrer">OpenRouter</a></p>
+        </details>
+
+        <div id="results" class="results"></div>
+
+        <div class="pagination" id="paginationWrap">
+          <label class="field field-compact">
+            <span class="field-label">Page size</span>
+            <select id="pageSize">
+              <option>25</option>
+              <option>50</option>
+              <option selected>100</option>
+              <option>250</option>
+            </select>
+          </label>
+          <button id="prevPageBtn" type="button" class="btn">&larr; Prev</button>
+          <span id="pageLabel" class="page-label">Page 1 of 1</span>
+          <button id="nextPageBtn" type="button" class="btn">Next &rarr;</button>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
