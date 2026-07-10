@@ -52,4 +52,4 @@ The app opens as a frameless Electron window. Remote API calls (Poe models, Open
 
 ## Release
 
-Current stable release: `v1.0.0`
+Current stable release: `v1.1.0`
