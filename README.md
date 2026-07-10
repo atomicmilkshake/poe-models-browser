@@ -1,10 +1,10 @@
 # Poe Models Browser
 
-A fast, local web app for exploring Poe models with pricing, capabilities, and benchmark overlays.
+A frameless Electron desktop app for exploring Poe models with pricing, capabilities, and benchmark overlays.
 
 It combines:
 - Live model metadata from Poe (`/v1/models`)
-- Public benchmark snapshots from OpenRouter (`benchmarks.json` and `/api/benchmarks`)
+- Public benchmark snapshots from OpenRouter (`benchmarks.json` and live refresh)
 - Interactive filtering, sorting, and charting (including Pareto frontier and composite benchmark index)
 
 ## Highlights
@@ -23,10 +23,11 @@ It combines:
 
 ## Project Structure
 
+- `main.js` - Electron main process (frameless window, IPC fetch, window controls)
+- `preload.js` - secure bridge exposing `electronAPI` to the renderer
 - `index.html` - app shell and controls
 - `styles.css` - theme and layout
 - `app.js` - app logic, filtering, chart rendering, benchmark matching
-- `proxy.js` - local API proxy for Poe + OpenRouter benchmark fetch
 - `benchmarks.json` - cached OpenRouter model + benchmark snapshot
 - `Launch.bat` / `Poe Models Browser.lnk` - local launch helpers
 
@@ -39,21 +40,16 @@ npm install
 npm start
 ```
 
-Then open `http://localhost:8787`. On Windows you can also double-click `Launch.bat`.
+On Windows you can also double-click `Launch.bat`.
 
-The local server serves the app and proxies:
-- `GET /api/models` → Poe `/v1/models`
-- `GET /api/benchmarks` → OpenRouter models (for live benchmark refresh)
-
-A proxy is required because browsers block direct calls to those APIs (CORS). Opening `index.html` as a file will not load live Poe data.
+The app opens as a frameless Electron window. Remote API calls (Poe models, OpenRouter benchmarks) run in the main process via `net.fetch`, so no local CORS proxy is required. Models auto-load on startup from `https://api.poe.com/v1/models`.
 
 ## Notes
 
-- No `.env` is required. `POE_API_KEY` in `.env` is optional.
+- No `.env` or API key is required.
 - Benchmark coverage depends on OpenRouter mappings and available public benchmark fields.
-- If UI changes do not appear, do a hard refresh.
+- Scope is run-from-source via Electron (not a packaged installer).
 
 ## Release
 
 Current stable release: `v1.0.0`
-

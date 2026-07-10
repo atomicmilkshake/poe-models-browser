@@ -10,6 +10,18 @@
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
+  <div class="titlebar" id="titlebar" aria-label="Window title bar">
+    <div class="titlebar-drag">
+      <span class="titlebar-mark" aria-hidden="true"></span>
+      <span class="titlebar-label">Poe Models Browser</span>
+    </div>
+    <div class="window-controls" aria-label="Window controls">
+      <button type="button" id="winMinBtn" class="win-btn" title="Minimize" aria-label="Minimize">&#x2013;</button>
+      <button type="button" id="winMaxBtn" class="win-btn" title="Maximize" aria-label="Maximize">&#x25A1;</button>
+      <button type="button" id="winCloseBtn" class="win-btn win-btn-close" title="Close" aria-label="Close">&#x2715;</button>
+    </div>
+  </div>
+
   <div class="app-shell">
 
     <header class="topbar">
@@ -17,19 +29,17 @@
         <h1>Poe Models Browser</h1>
         <p>Browse // filter // chart the Poe <code>/v1/models</code> catalog. Benchmarks cross-referenced from OpenRouter.</p>
       </div>
-      <form class="topbar-fetch" id="fetchForm">
-        <label class="field">
-          <span class="field-label">Endpoint URL</span>
-          <input id="endpointUrl" type="text" value="http://localhost:8787/api/models" autocomplete="off" />
-        </label>
-        <label class="field">
-          <span class="field-label">Fallback URL (optional)</span>
-          <input id="proxyUrl" type="text" placeholder="https://api.poe.com/v1/models" autocomplete="off" />
-        </label>
-        <button id="loadBtn" type="submit" class="btn btn-primary">Load Models</button>
-        <button id="demoBtn" type="button" class="btn">Load Demo Data</button>
-        <button id="refreshBenchmarksBtn" type="button" class="btn">Refresh benchmarks</button>
-      </form>
+      <div class="topbar-right">
+        <form class="topbar-fetch" id="fetchForm">
+          <label class="field">
+            <span class="field-label">Endpoint URL</span>
+            <input id="endpointUrl" type="text" value="https://api.poe.com/v1/models" autocomplete="off" />
+          </label>
+          <button id="loadBtn" type="submit" class="btn btn-primary">Load Models</button>
+          <button id="demoBtn" type="button" class="btn">Load Demo Data</button>
+          <button id="refreshBenchmarksBtn" type="button" class="btn">Refresh benchmarks</button>
+        </form>
+      </div>
     </header>
 
     <div class="layout">
@@ -192,7 +202,7 @@
 
         <div id="stats" class="stats"></div>
 
-        <div id="status" class="status-line" aria-live="polite" aria-atomic="true">Click "Load Models" or "Load Demo Data" to begin.</div>
+        <div id="status" class="status-line" aria-live="polite" aria-atomic="true">Loading models...</div>
 
         <details class="chart-panel" id="chartPanel">
           <summary>Capability vs cost chart</summary>

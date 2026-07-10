@@ -3,7 +3,7 @@
 .env.local
 node_modules/
 
-# Optional local proxy logs
+# Logs
 *.log
 
 # OS / editor cruft

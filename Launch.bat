@@ -2,7 +2,7 @@
 setlocal
 cd /d "%~dp0"
 
-if not exist "node_modules\dotenv" (
+if not exist "node_modules\electron" (
   echo Installing dependencies...
   call npm install
   if errorlevel 1 (
@@ -12,7 +12,10 @@ if not exist "node_modules\dotenv" (
   )
 )
 
-echo Starting Poe Models Browser at http://localhost:8787 ...
-start "" "http://localhost:8787"
-node proxy.js
-pause
+echo Starting Poe Models Browser...
+call npm start
+if errorlevel 1 (
+  echo Failed to start Electron. Try: npm install
+  pause
+  exit /b 1
+)

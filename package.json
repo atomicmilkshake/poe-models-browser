@@ -3,11 +3,12 @@
   "version": "1.0.0",
   "private": true,
   "description": "Browse, filter, and benchmark Poe /v1/models catalog",
+  "main": "main.js",
   "scripts": {
-    "start": "node proxy.js",
-    "serve": "node proxy.js"
+    "start": "electron .",
+    "electron": "electron ."
   },
   "dependencies": {
-    "dotenv": "^16.4.5"
+    "electron": "^37.2.0"
   }
 }

@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const BENCHMARK_CACHE_KEY = "poe-browser-benchmarks-v3";
 const CHART_PANEL_STATE_KEY = "poe-browser-chart-open";
 const OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models";
-const BENCHMARK_PROXY_URL = "/api/benchmarks";
+const DEFAULT_POE_MODELS_URL = "https://api.poe.com/v1/models";
 
 const CHART_Y_METRICS = [
   { key: "composite", label: "Composite Index (blended)", higherBetter: true },
@@ -62,10 +62,12 @@ const state = {
 const els = {
   fetchForm: $("fetchForm"),
   endpointUrl: $("endpointUrl"),
-  proxyUrl: $("proxyUrl"),
   refreshBenchmarksBtn: $("refreshBenchmarksBtn"),
   loadBtn: $("loadBtn"),
   demoBtn: $("demoBtn"),
+  winMinBtn: $("winMinBtn"),
+  winMaxBtn: $("winMaxBtn"),
+  winCloseBtn: $("winCloseBtn"),
   searchInput: $("searchInput"),
   ownerChips: $("ownerChips"),
   inputChips: $("inputChips"),
@@ -817,6 +819,13 @@ function getParetoEligibleRows(rows) {
   return { points, frontierIds, frontier };
 }
 
+async function fetchJson(url) {
+  if (window.electronAPI?.fetchJson) return window.electronAPI.fetchJson(url);
+  const res = await fetch(url);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
 async function loadBundledBenchmarks() {
   try {
     const res = await fetch("benchmarks.json");
@@ -848,26 +857,11 @@ async function refreshBenchmarks() {
   setStatus("Refreshing benchmark data from OpenRouter...");
 
   try {
-    // Prefer local proxy (avoids CORS); fall back to public OpenRouter URL.
-    const candidates = [BENCHMARK_PROXY_URL, OPENROUTER_MODELS_URL];
-    let models = null;
-    let lastError = null;
-
-    for (const url of candidates) {
-      try {
-        const res = await fetch(url, { method: "GET", headers: { Accept: "application/json" } });
-        if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
-        const data = await res.json();
-        const list = data.data || data.models || (Array.isArray(data) ? data : []);
-        if (!Array.isArray(list) || !list.length) throw new Error("Unexpected response shape from " + url);
-        models = list;
-        break;
-      } catch (err) {
-        lastError = err;
-      }
+    const data = await fetchJson(OPENROUTER_MODELS_URL);
+    const models = data.data || data.models || (Array.isArray(data) ? data : []);
+    if (!Array.isArray(models) || !models.length) {
+      throw new Error("Unexpected response shape from " + OPENROUTER_MODELS_URL);
     }
-
-    if (!models) throw lastError || new Error("No benchmark source available");
 
     const payload = { fetchedAt: new Date().toISOString(), source: "openrouter", models };
     localStorage.setItem(BENCHMARK_CACHE_KEY, JSON.stringify(payload));
@@ -1655,43 +1649,25 @@ function setLoading(isLoading) {
 async function fetchModels() {
   if (state.loading) return;
 
-  const directUrl = els.endpointUrl.value.trim();
-  const proxyUrl = els.proxyUrl.value.trim();
-  const candidates = [directUrl, proxyUrl].filter(Boolean);
-
-  if (!candidates.length) {
-    setStatus("No endpoint URL provided.", true);
-    return;
-  }
+  const url = (els.endpointUrl.value.trim() || DEFAULT_POE_MODELS_URL);
 
   setLoading(true);
   setStatus("Loading models from Poe API...");
 
-  let lastError = null;
-  for (const url of candidates) {
-    try {
-      const res = await fetch(url, { method: "GET" });
-      if (!res.ok) throw new Error("HTTP " + res.status + " from " + url);
-      const data = await res.json();
-      if (!Array.isArray(data?.data)) throw new Error("Unexpected response shape from " + url);
+  try {
+    const data = await fetchJson(url);
+    if (!Array.isArray(data?.data)) throw new Error("Unexpected response shape from " + url);
 
-      state.raw = data.data.map(normalizeModel);
-      state.page = 1;
-      rebuildFacetChips(state.raw);
-      renderAll();
-      setLoading(false);
-      setStatus("Loaded " + state.raw.length + " models successfully.");
-      return;
-    } catch (err) {
-      lastError = err;
-    }
+    state.raw = data.data.map(normalizeModel);
+    state.page = 1;
+    rebuildFacetChips(state.raw);
+    renderAll();
+    setStatus("Loaded " + state.raw.length + " models successfully.");
+  } catch (err) {
+    setStatus("Load failed: " + (err.message || "Unknown error") + ".", true);
+  } finally {
+    setLoading(false);
   }
-
-  setLoading(false);
-  const hint = lastError?.message?.includes("Failed to fetch")
-    ? " This is likely a CORS restriction — try running a local proxy and entering its URL above."
-    : "";
-  setStatus("Load failed: " + (lastError?.message || "Unknown error") + "." + hint, true);
 }
 
 function loadDemoData() {
@@ -1706,8 +1682,20 @@ function loadDemoData() {
     rebuildFacetChips(state.raw);
     renderAll();
     setLoading(false);
-    setStatus("Loaded demo data with " + state.raw.length + " models. (Real data requires a working proxy or CORS-enabled endpoint)");
+    setStatus("Loaded demo data with " + state.raw.length + " models.");
   }, 120);
+}
+
+function wireWindowControls() {
+  if (!window.electronAPI) return;
+  els.winMinBtn?.addEventListener("click", () => window.electronAPI.windowMinimize());
+  els.winMaxBtn?.addEventListener("click", () => window.electronAPI.windowMaximize());
+  els.winCloseBtn?.addEventListener("click", () => window.electronAPI.windowClose());
+
+  // Double-click the drag strip to toggle maximize (common desktop chrome).
+  $("titlebar")?.querySelector(".titlebar-drag")?.addEventListener("dblclick", () => {
+    window.electronAPI.windowMaximize();
+  });
 }
 
 function debounce(fn, ms) {
@@ -1819,6 +1807,8 @@ function restoreChartPanelState() {
 }
 
 function wireEvents() {
+  wireWindowControls();
+
   els.fetchForm.addEventListener("submit", (e) => {
     e.preventDefault();
     fetchModels();
@@ -1955,6 +1945,7 @@ async function init() {
   await loadBundledBenchmarks();
   loadCachedBenchmarks();
   renderAll();
+  await fetchModels();
 }
 
 init();

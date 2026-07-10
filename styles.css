@@ -42,6 +42,7 @@ html, body {
 
 body {
   min-height: 100vh;
+  padding-top: 36px;
   background:
     radial-gradient(ellipse 90% 60% at 10% -10%, rgba(255, 43, 214, 0.18), transparent 55%),
     radial-gradient(ellipse 70% 50% at 95% 5%, rgba(0, 240, 255, 0.16), transparent 50%),
@@ -87,6 +88,112 @@ body::after {
   padding: 20px 24px 40px;
 }
 
+/* ---------- Electron titlebar ---------- */
+
+.titlebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 10001;
+  height: 36px;
+  display: flex;
+  align-items: stretch;
+  background:
+    linear-gradient(90deg, rgba(255, 43, 214, 0.12) 0%, transparent 28%),
+    linear-gradient(180deg, #12101f 0%, #0d0a1a 100%);
+  border-bottom: 1px solid var(--border-strong);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.08);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.titlebar::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.55), rgba(255, 43, 214, 0.45), transparent);
+  pointer-events: none;
+}
+
+.titlebar-drag {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 14px;
+  -webkit-app-region: drag;
+}
+
+.titlebar-mark {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  background: var(--brand);
+  box-shadow: var(--glow-cyan);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+.titlebar-label {
+  font-family: var(--sans);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.window-controls {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn {
+  width: 46px;
+  height: 36px;
+  border: 0;
+  border-left: 1px solid rgba(42, 36, 80, 0.9);
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 120ms ease, color 120ms ease, text-shadow 120ms ease;
+  -webkit-app-region: no-drag;
+}
+
+.win-btn:hover {
+  background: rgba(0, 240, 255, 0.12);
+  color: var(--brand);
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.55);
+}
+
+.win-btn-close {
+  width: 52px;
+  color: #c9a0b0;
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 10px 100%, 0 calc(100% - 10px));
+}
+
+.win-btn-close:hover {
+  background: linear-gradient(135deg, rgba(255, 61, 110, 0.35), rgba(255, 43, 214, 0.25));
+  color: #fff;
+  text-shadow: 0 0 12px rgba(255, 61, 110, 0.8), 0 0 24px rgba(255, 43, 214, 0.45);
+}
+
+.win-btn-close:active {
+  background: rgba(255, 61, 110, 0.5);
+}
+
 /* ---------- Topbar ---------- */
 
 .topbar {
@@ -102,6 +209,11 @@ body::after {
   padding: 20px 24px;
   margin-bottom: 18px;
   clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 18px, 100% 100%, 18px 100%, 0 calc(100% - 18px));
+}
+
+.topbar-brand {
+  flex: 1 1 240px;
+  min-width: 0;
 }
 
 .topbar-brand h1 {
@@ -130,6 +242,13 @@ body::after {
   padding: 1px 6px;
   font-size: 0.85rem;
   color: var(--brand);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .topbar-fetch {
@@ -1099,6 +1218,10 @@ td code, .mono {
     flex-direction: column;
     align-items: stretch;
     clip-path: none;
+  }
+
+  .topbar-right {
+    width: 100%;
   }
 
   .toolbar {
