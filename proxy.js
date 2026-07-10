@@ -1,14 +1,13 @@
 // Tiny local proxy that:
 //   1. Serves the static app (index.html, app.js, styles.css, benchmarks.json)
-//   2. Forwards GET /api/models -> https://api.poe.com/v1/models with your key
+//   2. Forwards GET /api/models -> https://api.poe.com/v1/models (public; no key required)
 //   3. Forwards GET /api/benchmarks -> https://openrouter.ai/api/v1/models (public, no key)
 //
 // Usage:
-//   1. cp .env.example .env   (then fill in POE_API_KEY)
-//   2. npm install
-//   3. npm start
-//   4. Open http://localhost:8787
-//   5. In the app, set Endpoint URL (or Local proxy URL) = http://localhost:8787/api/models
+//   1. npm install
+//   2. npm start
+//   3. Open http://localhost:8787
+//   4. In the app, set Endpoint URL (or Local proxy URL) = http://localhost:8787/api/models
 
 const http = require("http");
 const fs = require("fs");
@@ -20,6 +19,7 @@ require("dotenv").config({ path: path.join(__dirname, ".env") });
 const PORT = process.env.PORT || 8787;
 const ROOT = __dirname;
 
+// Optional: if set, sent as Bearer auth. Poe's /v1/models is public and works without it.
 const POE_API_KEY = process.env.POE_API_KEY || "";
 
 const MIME = {
@@ -69,15 +69,11 @@ function fetchJson(url, headers) {
 async function handleProxy(req, res) {
   try {
     if (req.url.startsWith("/api/models")) {
-      if (!POE_API_KEY) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        res.end(JSON.stringify({ error: "POE_API_KEY not set in .env" }));
-        return;
+      const headers = { Accept: "application/json" };
+      if (POE_API_KEY) {
+        headers.Authorization = `Bearer ${POE_API_KEY}`;
       }
-      const upstream = await fetchJson("https://api.poe.com/v1/models", {
-        Authorization: `Bearer ${POE_API_KEY}`,
-        Accept: "application/json"
-      });
+      const upstream = await fetchJson("https://api.poe.com/v1/models", headers);
       res.writeHead(upstream.status, { "Content-Type": "application/json" });
       res.end(upstream.body);
       return;
@@ -102,6 +98,6 @@ async function handleProxy(req, res) {
 const server = http.createServer(handleProxy);
 server.listen(PORT, () => {
   console.log(`Poe Models Browser running at http://localhost:${PORT}`);
-  console.log(`  POE_API_KEY: ${POE_API_KEY ? "set" : "NOT SET (edit .env)"}`);
+  console.log(`  Models: Poe public /v1/models${POE_API_KEY ? " (with optional API key)" : ""}`);
   console.log(`  Benchmarks: OpenRouter public /api/v1/models (no key)`);
 });

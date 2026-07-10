@@ -32,43 +32,24 @@ It combines:
 
 ## Quick Start
 
-### 1) Install dependencies
+Requires [Node.js](https://nodejs.org/). No Poe API key needed — Poe's `/v1/models` list is public.
 
 ```bash
 npm install
-```
-
-### 2) Optional: configure Poe API key
-
-Model listing from Poe can work without auth, but you can add a key for authenticated requests.
-
-```bash
-copy .env.example .env
-```
-
-Then edit `.env`:
-
-```env
-POE_API_KEY=your_key_here
-```
-
-### 3) Run local proxy
-
-```bash
 npm start
 ```
 
-Proxy runs on `http://127.0.0.1:3847` and serves:
-- `GET /api/models`
-- `GET /api/benchmarks`
+Then open `http://localhost:8787`. On Windows you can also double-click `Launch.bat`.
 
-### 4) Open the app
+The local server serves the app and proxies:
+- `GET /api/models` → Poe `/v1/models`
+- `GET /api/benchmarks` → OpenRouter models (for live benchmark refresh)
 
-Open `index.html` directly in your browser, or use `Launch.bat` / the shortcut.
+A proxy is required because browsers block direct calls to those APIs (CORS). Opening `index.html` as a file will not load live Poe data.
 
 ## Notes
 
-- `.env` is ignored and should never be committed.
+- No `.env` is required. `POE_API_KEY` in `.env` is optional.
 - Benchmark coverage depends on OpenRouter mappings and available public benchmark fields.
 - If UI changes do not appear, do a hard refresh.
 

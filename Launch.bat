@@ -12,14 +12,6 @@ if not exist "node_modules\dotenv" (
   )
 )
 
-if not exist ".env" (
-  if exist ".env.example" copy ".env.example" ".env" >nul
-  echo Created .env — add your POE_API_KEY, then re-run this launcher.
-  notepad ".env"
-  pause
-  exit /b 1
-)
-
 echo Starting Poe Models Browser at http://localhost:8787 ...
 start "" "http://localhost:8787"
 node proxy.js
