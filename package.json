@@ -1,12 +1,14 @@
 {
   "name": "poe-models-browser",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Browse, filter, and benchmark Poe /v1/models catalog",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "electron": "electron ."
+    "electron": "electron .",
+    "bootstrap": "node scripts/bootstrap.mjs",
+    "journal-check": "node scripts/journal-check.mjs"
   },
   "dependencies": {
     "electron": "^37.2.0"

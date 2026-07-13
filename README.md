@@ -17,7 +17,7 @@ It combines:
 - Cost vs capability chart:
   - selectable X and Y metrics
   - composite benchmark index
-  - Pareto frontier overlay
+  - optional Pareto and Costanza frontier overlays (Costanza: P70–P85 intelligence band, thriftiest in-band; hard ceiling at P85)
   - log-scaled cost axis for outlier-heavy pricing
 - Smarter benchmark matching between Poe model IDs and OpenRouter slugs
 
@@ -30,6 +30,9 @@ It combines:
 - `app.js` - app logic, filtering, chart rendering, benchmark matching
 - `benchmarks.json` - cached OpenRouter model + benchmark snapshot
 - `Launch.bat` / `Poe Models Browser.lnk` - local launch helpers
+- `docs/` - **central documentation** ([docs/index.md](docs/index.md))
+- `AGENTS.md` - agent session protocol and journal rules
+- `scripts/bootstrap.mjs` / `journal-check.mjs` - agent bootstrap and journal enforcement
 
 ## Quick Start
 
@@ -44,6 +47,10 @@ On Windows you can also double-click `Launch.bat`.
 
 The app opens as a frameless Electron window. Remote API calls (Poe models, OpenRouter benchmarks) run in the main process via `net.fetch`, so no local CORS proxy is required. Models auto-load on startup from `https://api.poe.com/v1/models`.
 
+## Documentation
+
+All deep docs live under [`docs/`](docs/index.md) (architecture, product notes, daily agent journal). Agents should run `npm run bootstrap` at session start and append to `docs/journal/YYYY-MM-DD.md` every write-turn (`npm run journal-check` enforces it).
+
 ## Notes
 
 - No `.env` or API key is required.
@@ -52,4 +59,4 @@ The app opens as a frameless Electron window. Remote API calls (Poe models, Open
 
 ## Release
 
-Current stable release: `v1.1.0`
+Current stable release: `v1.2.0`

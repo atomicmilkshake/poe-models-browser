@@ -19,6 +19,13 @@ const CHART_Y_METRICS = [
 const COMPOSITE_ELO_MIN = 800;
 const COMPOSITE_ELO_MAX = 1500;
 
+/**
+ * Costanza frontier: thriftiest models in the upper-mid intelligence band.
+ * Floor = 70th percentile, hard ceiling = 85th (of intelligence among plottable models).
+ */
+const COSTANZA_P_LOW = 70;
+const COSTANZA_P_HIGH = 85;
+
 const CHART_X_METRICS = [
   { key: "blended_cost", label: "Blended $/1M (Poe)", lowerBetter: true },
   { key: "prompt_cost", label: "Prompt $/1M", lowerBetter: true },
@@ -35,6 +42,8 @@ const state = {
   benchmarksLoaded: false,
   chartY: "intelligence",
   chartX: "blended_cost",
+  showParetoFrontier: true,
+  showCostanzaFrontier: false,
   facets: {
     owners: new Set(),
     inputs: new Set(),
@@ -45,6 +54,7 @@ const state = {
     benchmarkedOnly: false,
     toolsOnly: false,
     webSearchOnly: false,
+    reasoningOnly: false,
     paretoOnly: false,
     blendedMin: null,
     blendedMax: null,
@@ -78,6 +88,7 @@ const els = {
   benchmarkedOnlyChip: $("benchmarkedOnlyChip"),
   toolsOnlyChip: $("toolsOnlyChip"),
   webSearchOnlyChip: $("webSearchOnlyChip"),
+  reasoningOnlyChip: $("reasoningOnlyChip"),
   paretoOnlyChip: $("paretoOnlyChip"),
   blendedMin: $("blendedMin"),
   blendedMax: $("blendedMax"),
@@ -111,6 +122,8 @@ const els = {
   chartPanel: $("chartPanel"),
   chartYAxis: $("chartYAxis"),
   chartXAxis: $("chartXAxis"),
+  paretoFrontierToggle: $("paretoFrontierToggle"),
+  costanzaFrontierToggle: $("costanzaFrontierToggle"),
   benchmarkChart: $("benchmarkChart"),
   chartTooltip: $("chartTooltip"),
   results: $("results"),
@@ -484,6 +497,10 @@ function normalizeModel(m) {
     has_pricing: [pricing.prompt, pricing.completion, pricing.image, pricing.request, m.price_prompt, m.price_completion].some(v => v != null),
     supports_tools: features.includes("tools") || m.supports_tools === true,
     supports_web_search: features.includes("web_search") || m.supports_web_search === true,
+    // Poe exposes reasoning as an object when the model supports thinking/reasoning; null otherwise.
+    supports_reasoning: m.reasoning != null || m.supports_reasoning === true,
+    reasoning_effort: m.reasoning?.supports_reasoning_effort === true,
+    reasoning_required: m.reasoning?.required === true,
     input_primary: input[0] || "Unknown",
     output_primary: output[0] || "Unknown",
     endpoint_primary: endpoints[0] || "None",
@@ -796,19 +813,34 @@ function computeParetoFrontier(points, yHigherBetter = true, xLowerBetter = true
   return frontier;
 }
 
-function getParetoEligibleRows(rows) {
-  const yMeta = CHART_Y_METRICS.find(m => m.key === state.chartY);
-  const xMeta = CHART_X_METRICS.find(m => m.key === state.chartX);
-  const points = [];
-  const pointById = new Map();
+/** Linear-interpolated percentile for a pre-sorted ascending numeric array. */
+function percentileValue(sortedAsc, p) {
+  if (!sortedAsc.length) return null;
+  if (sortedAsc.length === 1) return sortedAsc[0];
+  const clamped = Math.min(100, Math.max(0, p));
+  const idx = (clamped / 100) * (sortedAsc.length - 1);
+  const lo = Math.floor(idx);
+  const hi = Math.ceil(idx);
+  if (lo === hi) return sortedAsc[lo];
+  const t = idx - lo;
+  return sortedAsc[lo] * (1 - t) + sortedAsc[hi] * t;
+}
 
+function getPlottableChartPoints(rows) {
+  const points = [];
   for (const row of rows) {
     if (!row.benchmark_match) continue;
     const pt = getChartPoint(row);
     if (!pt) continue;
     points.push(pt);
-    pointById.set(row.id, pt);
   }
+  return points;
+}
+
+function getParetoEligibleRows(rows) {
+  const yMeta = CHART_Y_METRICS.find(m => m.key === state.chartY);
+  const xMeta = CHART_X_METRICS.find(m => m.key === state.chartX);
+  const points = getPlottableChartPoints(rows);
 
   const frontier = computeParetoFrontier(
     points,
@@ -817,6 +849,77 @@ function getParetoEligibleRows(rows) {
   );
   const frontierIds = new Set(frontier.map(p => p.id));
   return { points, frontierIds, frontier };
+}
+
+/**
+ * Costanza frontier: among plottable models whose intelligence is between the
+ * 70th and 85th percentiles (hard ceiling), the cost-vs-capability Pareto set
+ * on the current chart axes ("cheapest at a given capability level" in-band).
+ */
+function getCostanzaFrontier(rows) {
+  const yMeta = CHART_Y_METRICS.find(m => m.key === state.chartY);
+  const xMeta = CHART_X_METRICS.find(m => m.key === state.chartX);
+  const points = getPlottableChartPoints(rows);
+
+  const intelScores = points
+    .map(p => p.row?.benchmark?.intelligence)
+    .filter(Number.isFinite)
+    .sort((a, b) => a - b);
+
+  if (intelScores.length < 2) {
+    return {
+      points,
+      bandPoints: [],
+      frontier: [],
+      frontierIds: new Set(),
+      band: null
+    };
+  }
+
+  const intelLow = percentileValue(intelScores, COSTANZA_P_LOW);
+  const intelHigh = percentileValue(intelScores, COSTANZA_P_HIGH);
+  const bandPoints = points.filter(p => {
+    const intel = p.row?.benchmark?.intelligence;
+    return Number.isFinite(intel) && intel >= intelLow && intel <= intelHigh;
+  });
+
+  const frontier = computeParetoFrontier(
+    bandPoints,
+    yMeta?.higherBetter !== false,
+    xMeta?.lowerBetter !== false
+  );
+  const frontierIds = new Set(frontier.map(p => p.id));
+
+  return {
+    points,
+    bandPoints,
+    frontier,
+    frontierIds,
+    band: {
+      pLow: COSTANZA_P_LOW,
+      pHigh: COSTANZA_P_HIGH,
+      intelLow,
+      intelHigh
+    }
+  };
+}
+
+/** Build an axis-aligned step path for a cost-vs-capability frontier (sorted by x). */
+function frontierStepPathD(frontier, sx, sy, useLogX) {
+  if (frontier.length < 2) return null;
+  const steps = [];
+  for (let i = 0; i < frontier.length; i++) {
+    const pt = frontier[i];
+    if (useLogX && !(pt.x > 0)) continue;
+    steps.push({ x: sx(pt.x), y: sy(pt.y) });
+    if (i < frontier.length - 1) {
+      const next = frontier[i + 1];
+      if (useLogX && !(next.x > 0)) continue;
+      steps.push({ x: sx(next.x), y: sy(pt.y) });
+    }
+  }
+  if (steps.length < 2) return null;
+  return steps.map((p, i) => (i === 0 ? "M" : "L") + p.x + " " + p.y).join(" ");
 }
 
 async function fetchJson(url) {
@@ -987,6 +1090,7 @@ function rebuildFacetChips(rows) {
   setToggleChipState(els.benchmarkedOnlyChip, state.facets.benchmarkedOnly);
   setToggleChipState(els.toolsOnlyChip, state.facets.toolsOnly);
   setToggleChipState(els.webSearchOnlyChip, state.facets.webSearchOnly);
+  setToggleChipState(els.reasoningOnlyChip, state.facets.reasoningOnly);
   setToggleChipState(els.paretoOnlyChip, state.facets.paretoOnly);
   configureSlidersFromRows(rows);
 }
@@ -1291,6 +1395,7 @@ function applyFilters() {
     if (state.facets.benchmarkedOnly && !row.benchmark_match) return false;
     if (state.facets.toolsOnly && !row.supports_tools) return false;
     if (state.facets.webSearchOnly && !row.supports_web_search) return false;
+    if (state.facets.reasoningOnly && !row.supports_reasoning) return false;
     if (!inRange(rowBlendedCost(row), state.facets.blendedMin, state.facets.blendedMax)) return false;
     if (!inRange(rowPromptCost(row), state.facets.promptMin, state.facets.promptMax)) return false;
     if (!inRange(rowCompletionCost(row), state.facets.completionMin, state.facets.completionMax)) return false;
@@ -1434,7 +1539,13 @@ function renderChart() {
 
   const yMeta = CHART_Y_METRICS.find(m => m.key === state.chartY);
   const xMeta = CHART_X_METRICS.find(m => m.key === state.chartX);
-  const { points, frontierIds, frontier } = getParetoEligibleRows(state.filtered);
+  const eligible = getParetoEligibleRows(state.filtered);
+  const points = eligible.points;
+  const frontier = state.showParetoFrontier ? eligible.frontier : [];
+  const frontierIds = state.showParetoFrontier ? eligible.frontierIds : new Set();
+  const costanza = state.showCostanzaFrontier ? getCostanzaFrontier(state.filtered) : null;
+  const costanzaIds = costanza?.frontierIds || new Set();
+  const costanzaFrontier = costanza?.frontier || [];
 
   const width = 720;
   const height = 360;
@@ -1514,21 +1625,19 @@ function renderChart() {
   svg += '<text x="' + (margin.left + plotW / 2) + '" y="' + (height - 2) + '" text-anchor="middle" class="chart-axis-label">' + escapeHtml(xAxisLabel) + "</text>";
   svg += '<text transform="rotate(-90)" x="' + (-(margin.top + plotH / 2)) + '" y="16" text-anchor="middle" class="chart-axis-label">' + escapeHtml(yMeta?.label || "Y") + "</text>";
 
-  if (frontier.length > 1 && yMeta?.higherBetter && xMeta?.lowerBetter) {
-    const steps = [];
-    for (let i = 0; i < frontier.length; i++) {
-      const pt = frontier[i];
-      if (useLogX && !(pt.x > 0)) continue;
-      steps.push({ x: sx(pt.x), y: sy(pt.y) });
-      if (i < frontier.length - 1) {
-        const next = frontier[i + 1];
-        if (useLogX && !(next.x > 0)) continue;
-        steps.push({ x: sx(next.x), y: sy(pt.y) });
-      }
+  const canDrawFrontier = yMeta?.higherBetter && xMeta?.lowerBetter;
+
+  if (state.showParetoFrontier && canDrawFrontier) {
+    const paretoPath = frontierStepPathD(frontier, sx, sy, useLogX);
+    if (paretoPath) {
+      svg += '<path d="' + paretoPath + '" class="chart-frontier" fill="none"/>';
     }
-    if (steps.length > 1) {
-      const pathD = steps.map((p, i) => (i === 0 ? "M" : "L") + p.x + " " + p.y).join(" ");
-      svg += '<path d="' + pathD + '" class="chart-frontier" fill="none"/>';
+  }
+
+  if (state.showCostanzaFrontier && canDrawFrontier) {
+    const costanzaPath = frontierStepPathD(costanzaFrontier, sx, sy, useLogX);
+    if (costanzaPath) {
+      svg += '<path d="' + costanzaPath + '" class="chart-frontier-costanza" fill="none"/>';
     }
   }
 
@@ -1537,8 +1646,34 @@ function renderChart() {
     const cx = sx(pt.x);
     const cy = sy(pt.y);
     const onFrontier = frontierIds.has(pt.id);
-    const title = pt.id + ": " + (yMeta?.label || "Y") + " " + fmtChartValue(pt.y, state.chartY) + ", " + (xMeta?.label || "X") + " " + fmtChartValue(pt.x, state.chartX);
-    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="6" class="chart-point' + (onFrontier ? " is-frontier" : "") + '" data-model-id="' + escapeHtml(pt.id) + '" data-tooltip="' + escapeHtml(title) + '"><title>' + escapeHtml(title) + "</title></circle>";
+    const onCostanza = costanzaIds.has(pt.id);
+    let cls = "chart-point";
+    if (onFrontier) cls += " is-frontier";
+    if (onCostanza) cls += " is-costanza";
+    let title = pt.id + ": " + (yMeta?.label || "Y") + " " + fmtChartValue(pt.y, state.chartY) + ", " + (xMeta?.label || "X") + " " + fmtChartValue(pt.x, state.chartX);
+    if (onFrontier) title += " [Pareto]";
+    if (onCostanza && costanza?.band) {
+      title += " [Costanza P" + costanza.band.pLow + "–P" + costanza.band.pHigh + "]";
+    }
+    svg += '<circle cx="' + cx + '" cy="' + cy + '" r="6" class="' + cls + '" data-model-id="' + escapeHtml(pt.id) + '" data-tooltip="' + escapeHtml(title) + '"><title>' + escapeHtml(title) + "</title></circle>";
+  }
+
+  // Legend only for active overlays.
+  if (state.showParetoFrontier || state.showCostanzaFrontier) {
+    const lx = margin.left + 8;
+    const ly = margin.top + 10;
+    let legendX = lx;
+    svg += '<g class="chart-legend" aria-hidden="true">';
+    if (state.showParetoFrontier) {
+      svg += '<line x1="' + legendX + '" y1="' + ly + '" x2="' + (legendX + 22) + '" y2="' + ly + '" class="chart-frontier"/>';
+      svg += '<text x="' + (legendX + 28) + '" y="' + (ly + 4) + '" class="chart-legend-label">Pareto</text>';
+      legendX += 90;
+    }
+    if (state.showCostanzaFrontier) {
+      svg += '<line x1="' + legendX + '" y1="' + ly + '" x2="' + (legendX + 22) + '" y2="' + ly + '" class="chart-frontier-costanza"/>';
+      svg += '<text x="' + (legendX + 28) + '" y="' + (ly + 4) + '" class="chart-legend-label">Costanza P' + COSTANZA_P_LOW + "–P" + COSTANZA_P_HIGH + "</text>";
+    }
+    svg += "</g>";
   }
 
   els.benchmarkChart.setAttribute("viewBox", "0 0 " + width + " " + height);
@@ -1717,6 +1852,7 @@ function clearFilters() {
   state.facets.benchmarkedOnly = false;
   state.facets.toolsOnly = false;
   state.facets.webSearchOnly = false;
+  state.facets.reasoningOnly = false;
   state.facets.paretoOnly = false;
   state.facets.blendedMin = null;
   state.facets.blendedMax = null;
@@ -1856,11 +1992,35 @@ function wireEvents() {
     rerender();
   });
 
+  els.reasoningOnlyChip?.addEventListener("click", () => {
+    state.facets.reasoningOnly = !state.facets.reasoningOnly;
+    setToggleChipState(els.reasoningOnlyChip, state.facets.reasoningOnly);
+    rerender();
+  });
+
   els.paretoOnlyChip.addEventListener("click", () => {
     state.facets.paretoOnly = !state.facets.paretoOnly;
     setToggleChipState(els.paretoOnlyChip, state.facets.paretoOnly);
     rerender();
   });
+
+  if (els.paretoFrontierToggle) {
+    setToggleChipState(els.paretoFrontierToggle, state.showParetoFrontier);
+    els.paretoFrontierToggle.addEventListener("click", () => {
+      state.showParetoFrontier = !state.showParetoFrontier;
+      setToggleChipState(els.paretoFrontierToggle, state.showParetoFrontier);
+      renderChart();
+    });
+  }
+
+  if (els.costanzaFrontierToggle) {
+    setToggleChipState(els.costanzaFrontierToggle, state.showCostanzaFrontier);
+    els.costanzaFrontierToggle.addEventListener("click", () => {
+      state.showCostanzaFrontier = !state.showCostanzaFrontier;
+      setToggleChipState(els.costanzaFrontierToggle, state.showCostanzaFrontier);
+      renderChart();
+    });
+  }
 
   for (const def of SLIDER_DEFS) {
     const minEl = def.minEl();

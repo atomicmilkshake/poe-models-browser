@@ -60,6 +60,7 @@
             <button id="benchmarkedOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false" title="Only models matched to an OpenRouter benchmark entry.">Has benchmark</button>
             <button id="toolsOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false">Supports tools</button>
             <button id="webSearchOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false">Web search</button>
+            <button id="reasoningOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false" title="Only models that advertise reasoning/thinking support via Poe's reasoning metadata (non-null reasoning object).">Reasoning</button>
             <button id="paretoOnlyChip" type="button" class="chip chip-toggle" aria-pressed="false" title="Show only models on the cost-vs-intelligence Pareto frontier. Requires benchmark match and per-token pricing.">Pareto frontier</button>
           </div>
 
@@ -222,6 +223,13 @@
                 <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="1" aria-pressed="false">&lt; $1</button>
                 <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="5" aria-pressed="false">&lt; $5</button>
                 <button type="button" class="chip chip-toggle chart-price-preset" data-blended-max="20" aria-pressed="false">&lt; $20</button>
+              </div>
+            </div>
+            <div class="chart-presets" aria-label="Frontier overlays">
+              <span class="field-label">Overlays</span>
+              <div class="quick-chip-row chart-preset-row">
+                <button type="button" id="paretoFrontierToggle" class="chip chip-toggle" aria-pressed="true" title="Show the global cost-vs-capability Pareto frontier (cyan dashed). Display only — does not filter the table. Use the sidebar Pareto chip to filter.">Pareto frontier</button>
+                <button type="button" id="costanzaFrontierToggle" class="chip chip-toggle" aria-pressed="false" title="Show the Costanza frontier: thriftiest models in the 70th–85th percentile intelligence band (hard ceiling at P85). Band uses Intelligence Index; line is the in-band Pareto on the current chart axes. Gold stroke.">Costanza frontier</button>
               </div>
             </div>
           </div>
